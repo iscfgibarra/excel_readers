@@ -1,6 +1,6 @@
-#ExcelReaders
+# ExcelReaders
 
-##Tabla de Contenido
+## Tabla de Contenido
 
 - [Motivación](#motivación)
 - [Configuración](#configuración)
@@ -50,13 +50,13 @@ La sección puede configurarse de la siguiente manera:
 ## ExcelMappingSection
 
 
-###ExcelMapping
+### ExcelMapping
 
 Un ExcelMapping puede contener múltiples mappers y sheets. 
 
 * **Name**: El nombre con que se identifica, este nombre permite asociar la configuración con el ExcelReader especifico.
 
-###Mapper
+### Mapper
 
 Un mapper contiene MapElements que son asociaciones de los campos de la clase con las columnas de la hoja de Excel.
 
