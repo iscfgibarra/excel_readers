@@ -25,16 +25,22 @@ namespace ExcelReaders.Core
 
         private DateTimeTypeConvertion _latestTypeConvertion;
         
+        private string _xlsfullPath { get; set; }
+        
         public ConcurrentBag<T> GetDataList => _rowDataList;
 
         public static string ExcelSourceDirectory { get; set; }
 
         public string XlsFilename { get; set; }
+        
+        
 
         public string XlsFullPath
         {
             get
             {
+                if (!string.IsNullOrEmpty(_xlsfullPath)) return _xlsfullPath;
+                
                 var xlsDirectory = XlsDirectory;
                 var xlsFilename = XlsFilename;
 
@@ -68,6 +74,12 @@ namespace ExcelReaders.Core
             XlsFilename = xlsFilename;                                    
             GetConfiguration(excelMappingName);
             ExcelSourceDirectory = excelSourceDirectory;
+        }
+
+        public BaseExcelReader(string pathExcelFile, string excelMappingName)
+        {
+            _xlsfullPath = pathExcelFile;
+            GetConfiguration(excelMappingName);
         }
 
         /// <summary>

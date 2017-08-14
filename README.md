@@ -214,7 +214,54 @@ ProyectoWeb/Aplicacion
 
 ```
 
-En el código de ejemplo se construye 
+En el código de ejemplo se construye la clase como un repositorio que hereda de la clase  **BaseExcelReader< >** que es la que se encargará del 
+trabajo de procesar los datos.
+
+```
+public class AduanaExcelReader : BaseExcelReader<AduanaResult>
+{        
+	public AduanaExcelReader() : base(
+		"ExcelSourceDirectory"
+	    "ExcelFileName.xls"
+		"AduanaExcelMappingName")
+	{           
+            
+	}
+
+	public override void CalculateFields(ref AduanaResult obj)
+	{            
+		obj.Key = obj.Clave;
+	}
+}
+```
+
+Para usarlo basta con invocar el método **LoadData** y utilizar la propiedad **GetDataList** del ExcelReader.
+
+
+```
+ static void Main(string[] args)
+{
+	var reader = new AduanaExcelReader();
+	reader.LoadData();
+            
+	foreach (var item in reader.GetDataList)
+	{
+		System.Console.WriteLine(item);
+	}
+
+	reader = null;
+	
+	//Probando la persistencia de los datos
+	reader = new AduanaExcelReader();	
+	var list = reader.GetDataList;
+	
+	System.Console.Read();
+}
+```
+
+Al invocar **LoadData** una ConcurrentBag del tipo del expecificado se llenará y permanecerá en memoria hasta que termine el programa.
+Por lo que no es necesario llamar al meétodo cada vez que se necesitan los datos del Reader.
+
 
 ## Calculate Fields
 
