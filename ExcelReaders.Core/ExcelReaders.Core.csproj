@@ -62,6 +62,7 @@
   <ItemGroup>
     <Compile Include="BaseExcelReader.cs" />
     <Compile Include="DateTimeTypeConvertion.cs" />
+    <Compile Include="DynamicExcelReader.cs" />
     <Compile Include="IExcelReader.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

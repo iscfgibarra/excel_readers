@@ -12,5 +12,7 @@
         public string Default { get; set; }
 
         public string Format { get; set; }
+        
+        public string AttributeType { get; set; }
     }
 }

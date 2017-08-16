@@ -12,36 +12,34 @@ using ExcelReaders.Configuration.Helpers;
 using NPOI.HSSF.UserModel;
 using NPOI.SS.UserModel;
 
-
 namespace ExcelReaders.Core
 {
-   
-    public class BaseExcelReader<T> : IExcelReader<T> where T : class, new()
-    {       
-        private static ConcurrentBag<T> _rowDataList;
+    public class DynamicExcelReader 
+    {
+        private static ConcurrentBag<dynamic> _rowDataList;
 
         protected List<SheetConfig> SheetsConfig;
 
-        protected List<MapperConfig> MappersConfig;
+        public List<MapperConfig> MappersConfig;
 
         private DateTimeTypeConvertion _latestTypeConvertion;
-        
+
         private string _xlsfullPath { get; set; }
-        
-        public ConcurrentBag<T> GetDataList => _rowDataList;
+
+        public ConcurrentBag<dynamic> GetDataList => _rowDataList;
 
         public static string ExcelSourceDirectory { get; set; }
 
         public string XlsFilename { get; set; }
-        
-        
+
+
 
         public string XlsFullPath
         {
             get
             {
                 if (!string.IsNullOrEmpty(_xlsfullPath)) return _xlsfullPath;
-                
+
                 var xlsDirectory = XlsDirectory;
                 var xlsFilename = XlsFilename;
 
@@ -65,19 +63,19 @@ namespace ExcelReaders.Core
                 string codeBase = Assembly.GetExecutingAssembly().CodeBase;
                 UriBuilder uri = new UriBuilder(codeBase);
                 string path = Uri.UnescapeDataString(uri.Path);
-                return $"{Path.Combine(Path.GetDirectoryName(path), ExcelSourceDirectory)}\\";   ;
+                return $"{Path.Combine(Path.GetDirectoryName(path), ExcelSourceDirectory)}\\"; ;
             }
         }
 
 
-        public BaseExcelReader(string excelSourceDirectory, string xlsFilename, string excelMappingName)
+        public DynamicExcelReader(string excelSourceDirectory, string xlsFilename, string excelMappingName)
         {
-            XlsFilename = xlsFilename;                                    
+            XlsFilename = xlsFilename;
             GetConfiguration(excelMappingName);
             ExcelSourceDirectory = excelSourceDirectory;
         }
 
-        public BaseExcelReader(string pathExcelFile, string excelMappingName)
+        public DynamicExcelReader(string pathExcelFile, string excelMappingName)
         {
             _xlsfullPath = pathExcelFile;
             GetConfiguration(excelMappingName);
@@ -91,9 +89,9 @@ namespace ExcelReaders.Core
         {
             var config = new ExcelMappingGetter(excelMappingName);
             SheetsConfig = config.Sheets;
-            MappersConfig = config.Mappers;         
+            MappersConfig = config.Mappers;
         }
-        
+
         /// <summary>
         /// Carga los datos desde la hoja de las hojas de Excel especificadas y las 
         /// almacena en la variable estática _rowDataList.
@@ -103,8 +101,8 @@ namespace ExcelReaders.Core
         {
             if (_rowDataList == null)
             {
-                _rowDataList = new ConcurrentBag<T>();
-                
+                _rowDataList = new ConcurrentBag<dynamic>();
+
                 using (var fs = File.OpenRead(XlsFullPath))
                 {
                     var workBook = new HSSFWorkbook(fs);
@@ -112,68 +110,68 @@ namespace ExcelReaders.Core
                     bool hasMoreMappers = MappersConfig.Count > 1;
 
                     foreach (var sheetConfig in SheetsConfig)
-                    {                    
+                    {
                         var sheet = workBook.GetSheet(sheetConfig.SheetName);
-                        
+
                         if (hasMoreMappers)
                         {
                             mapperConfig = MappersConfig.FirstOrDefault(m => m.Name == sheetConfig.Map);
                         }
 
-                        for (int rowIndex = sheetConfig.RowNumberStartData - 1; 
-                                    rowIndex < sheetConfig.RowNumberStopData; 
+                        for (int rowIndex = sheetConfig.RowNumberStartData - 1;
+                                    rowIndex < sheetConfig.RowNumberStopData;
                                             rowIndex++)
                         {
-                            var row = sheet.GetRow(rowIndex);                            
-                            if(row == null) continue;
+                            var row = sheet.GetRow(rowIndex);
+                            if (row == null) continue;
 
                             var obj = FillObject(mapperConfig, row);
 
                             //Llenar propiedades derivadas de otras
                             CalculateFields(ref obj);
-                            
+
                             _rowDataList.Add(obj);
                         }
                     }
                 }
             }
-            
-            var lista = _rowDataList;            
+
+            var lista = _rowDataList;
             return lista.Count > 0;
         }
 
-        private T FillObject(MapperConfig mapperConfig, IRow row)
+        private dynamic FillObject(MapperConfig mapperConfig, IRow row)
         {
-            var obj = new T();
+            var obj = new ExpandoObject() as IDictionary<string, object>;
 
             foreach (var map in mapperConfig.Maps)
             {
-                if (obj is DynamicObject)
-                {
-                    IDictionary<string, object> expando = obj as ExpandoObject;
-                    
-                    expando.Add(map.Attribute, null);
-                }
+                obj.Add(map.Attribute, null);
                 
-                var propInfo = obj.GetType().GetProperty(map.Attribute);
-
                 if (!string.IsNullOrEmpty(map.Default))
-                {
-                    propInfo?.SetValue(obj, ConvertToAttributeType(propInfo, map.Default));
+                {                    
+                    obj[map.Attribute] = ConvertToAttributeType(map.AttributeType, map.Default);
                 }
 
                 if (map.Ignore) continue;
 
                 //Solo se formatea si la propiedad es String y el formato no esta vació
-                if (!string.IsNullOrEmpty(map.Format) && IsString(propInfo))
+                if (!string.IsNullOrEmpty(map.Format) && IsString(map.AttributeType))
                 {
                     var cell = row.GetCell(map.NoColumn);
-                    propInfo?.SetValue(obj, GetValueFormatted(cell, map.Format));
+                    obj[map.Attribute] = GetValueFormatted(cell, map.Format);                   
                 }
                 else
                 {
-                    var cell = row.GetCell(map.NoColumn);
-                    propInfo?.SetValue(obj, ConvertToAttributeType(propInfo, cell));
+                    if (GetAttributeType(map.AttributeType) == typeof(Guid))
+                    {
+                        obj[map.Attribute] = Guid.NewGuid();
+                    }
+                    else
+                    {
+                        var cell = row.GetCell(map.NoColumn);
+                        obj[map.Attribute] = ConvertToAttributeType(map.AttributeType, cell);
+                    }                                        
                 }
             }
             return obj;
@@ -183,9 +181,9 @@ namespace ExcelReaders.Core
         /// Esta funcion se utiliza cuando hay campos calculados que dependen de valores del objeto.       
         /// </summary>
         /// <param name="obj">El objeto donde se van a modificar los valores</param>
-        public virtual void CalculateFields(ref T obj)
+        public virtual void CalculateFields(ref dynamic obj)
         {
-            
+
         }
 
         /// <summary>
@@ -196,10 +194,9 @@ namespace ExcelReaders.Core
         /// <returns></returns>
         private string GetValueFormatted(ICell cell, string format)
         {
-            double doubleValue;
-            
+            double doubleValue;          
             if (cell.CellType == CellType.Blank) return string.Empty;
-            
+
             string propValue;
             switch (cell.CellType)
             {
@@ -208,7 +205,7 @@ namespace ExcelReaders.Core
                     break;
                 case CellType.String:
                     propValue = cell.StringCellValue;
-                    break;              
+                    break;
                 default:
                     propValue = string.Empty;
                     break;
@@ -217,7 +214,7 @@ namespace ExcelReaders.Core
             double.TryParse(propValue, out doubleValue);
             return doubleValue.ToString(format);
         }
-       
+
         /// <summary>
         /// Permite convertir el valor de la celda en el valor apropiado de 
         /// acuerdo al tipo del atributo.
@@ -227,9 +224,9 @@ namespace ExcelReaders.Core
         /// <param name="propertyInfo">Información de la propiedad</param>
         /// <param name="value">Valor de la celda</param>
         /// <returns></returns>
-        private object  ConvertToAttributeType (PropertyInfo propertyInfo, object value)
+        private object ConvertToAttributeType(string attributeType, object value)
         {
-           
+
             if (value == null) return null;
 
             try
@@ -237,23 +234,26 @@ namespace ExcelReaders.Core
                 //Se pregunta si es un string, algunas veces esta conversion falla
                 //sobre todo cuando el campo es de tipo Date, sin embargo no afecta el resultado 
                 //de las conversiones.
-                if (IsString(propertyInfo)) return value?.ToString();
+                if (IsString(attributeType)) return value?.ToString();
             }
             catch (Exception e)
             {
-                Debug.WriteLine(e.Message + propertyInfo);                
+                Debug.WriteLine(e.Message + attributeType);
             }
 
             object dateTimeConvertion;
-            if (ConvertFromDateTime(propertyInfo, value, out dateTimeConvertion)) return dateTimeConvertion;
+            if (ConvertFromDateTime(attributeType, value, out dateTimeConvertion)) return dateTimeConvertion;
 
-            return ConvertFromNumericTypes(propertyInfo, value);
+            return ConvertFromNumericTypes(attributeType, value);
         }
 
-        private object ConvertFromNumericTypes(PropertyInfo propertyInfo, object value)
+        private object ConvertFromNumericTypes(string attributeType, object value)
         {
-            var valor = (ICell) value;
-            var converter = TypeDescriptor.GetConverter(propertyInfo.PropertyType);
+            var valor = (ICell)value;
+
+            Type type = GetAttributeType(attributeType);
+            
+            var converter = TypeDescriptor.GetConverter(type);
 
             switch (valor.CellType)
             {
@@ -273,16 +273,45 @@ namespace ExcelReaders.Core
             }
         }
 
-        private bool ConvertFromDateTime(PropertyInfo propertyInfo, object value, out object dateTimeConvertion)
+
+        private Type GetAttributeType(string attributeType)
+        {
+            switch (attributeType)
+            {
+                case "Guid":
+                    return typeof(Guid);
+                case "String":
+                case "string":
+                    return typeof(string);
+                case "DateTime":
+                case "datetime":
+                    return typeof(DateTime);
+                case "Int":
+                case "int":
+                    return typeof(int);
+                case "DateTime?":
+                case "datetime?":
+                    return typeof(DateTime?);
+                default:
+                    return null;
+            }
+
+            
+        }
+
+        private bool ConvertFromDateTime(string attributeType, object value, out object dateTimeConvertion)
         {
             dateTimeConvertion = null;
 
-            if (propertyInfo.PropertyType == typeof(DateTime?))
+
+            Type type = GetAttributeType(attributeType);
+          
+            if (type == typeof(DateTime?))
             {
                 try
                 {
                     if (value.ToString() == "null") return true;
-                    if (string.IsNullOrEmpty(value.ToString())) return true;                    
+                    if (string.IsNullOrEmpty(value.ToString())) return true;
                 }
                 catch (Exception e)
                 {
@@ -293,21 +322,21 @@ namespace ExcelReaders.Core
                 return true;
             }
 
-            if (propertyInfo.PropertyType == typeof(DateTime))
+            if (type == typeof(DateTime))
             {
                 dateTimeConvertion = DateTimeConvertion(value);
                 return true;
             }
-            
+
             return false;
         }
 
-        private bool IsString(PropertyInfo propertyInfo)
+        private bool IsString(string attributeType)
         {
-            return propertyInfo.PropertyType == typeof(string) || propertyInfo.PropertyType == typeof(String);
+            return GetAttributeType(attributeType) == typeof(string) || GetAttributeType(attributeType) == typeof(String);
         }
-        
-        
+
+
         /// <summary>
         /// Convierte el valor proporcionado en fecha, el intento de conversión directo
         /// solo parseando el string del valor permite ganar velocidad en la conversión,
@@ -324,7 +353,7 @@ namespace ExcelReaders.Core
         private DateTime? DateTimeConvertion(object value)
         {
             DateTime? retval;
-                       
+
             try
             {
                 if (_latestTypeConvertion != 0)
@@ -345,11 +374,11 @@ namespace ExcelReaders.Core
                 }
             }
             catch
-            {                   
+            {
                 _latestTypeConvertion = DateTimeTypeConvertion.WithoutCulture;
             }
-            
-            
+
+
             //Si falla lo anterior hace la conversión basada en excepciones
             try
             {
@@ -381,7 +410,7 @@ namespace ExcelReaders.Core
         /// <returns>True si la colección no tiene elementos.</returns>
         public bool ClearData()
         {
-            _rowDataList = new ConcurrentBag<T>();
+            _rowDataList = new ConcurrentBag<dynamic>();
 
             return _rowDataList.Count == 0;
         }

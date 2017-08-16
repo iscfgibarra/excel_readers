@@ -69,7 +69,8 @@ namespace ExcelReaders.Configuration.Helpers
                             Attribute = mapElement.Attribute,
                             Ignore = mapElement.Ignore,
                             Default = mapElement.Default,
-                            Format = mapElement.Format
+                            Format = mapElement.Format,
+                            AttributeType = string.IsNullOrEmpty(mapElement.AttributeType) ? string.Empty : mapElement.AttributeType
                         });
                 }
 

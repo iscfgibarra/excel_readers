@@ -14,6 +14,8 @@ namespace ExcelReaders.Configuration
 
         private const string DefaultKey = "Default";
 
+        private const string AttributeTypeKey = "AttributeType";
+
         [ConfigurationProperty(AttributeKey)]
         public string Attribute
         {
@@ -52,6 +54,14 @@ namespace ExcelReaders.Configuration
             get { return (string)this[DefaultKey]; }
 
             set { this[DefaultKey] = value; }
+        }
+
+        [ConfigurationProperty(AttributeTypeKey)]
+        public string AttributeType
+        {
+            get { return (string)this[AttributeTypeKey]; }
+
+            set { this[AttributeTypeKey] = value; }
         }
     }
 }
