@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Dynamic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -148,13 +147,6 @@ namespace ExcelReaders.Core
 
             foreach (var map in mapperConfig.Maps)
             {
-                if (obj is DynamicObject)
-                {
-                    IDictionary<string, object> expando = obj as ExpandoObject;
-                    
-                    expando.Add(map.Attribute, null);
-                }
-                
                 var propInfo = obj.GetType().GetProperty(map.Attribute);
 
                 if (!string.IsNullOrEmpty(map.Default))
@@ -241,7 +233,9 @@ namespace ExcelReaders.Core
             }
             catch (Exception e)
             {
-                Debug.WriteLine(e.Message + propertyInfo);                
+                Debug.WriteLine("La celda no tiene formato de texto, se forzara su conversión." +
+                    "\n PropertyInfo:" + propertyInfo + "\n Value:" + value + "\n Type:" +
+                    typeof(T).FullName + "\n Message:" + e.Message + "\n Stacktrace:"  + e.StackTrace  );                
             }
 
             object dateTimeConvertion;
@@ -286,7 +280,7 @@ namespace ExcelReaders.Core
                 }
                 catch (Exception e)
                 {
-                    Debug.WriteLine(e.Message);
+                    Debug.WriteLine(typeof(T).FullName + e.Message + e.StackTrace + e.Source);
                 }
 
                 dateTimeConvertion = DateTimeConvertion(value);

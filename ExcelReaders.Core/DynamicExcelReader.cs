@@ -16,7 +16,7 @@ namespace ExcelReaders.Core
 {
     public class DynamicExcelReader 
     {
-        private static ConcurrentBag<dynamic> _rowDataList;
+        private ConcurrentBag<dynamic> _rowDataList;
 
         protected List<SheetConfig> SheetsConfig;
 
@@ -289,6 +289,9 @@ namespace ExcelReaders.Core
                 case "Int":
                 case "int":
                     return typeof(int);
+                case "Decimal":
+                case "decimal":
+                    return typeof(Decimal);
                 case "DateTime?":
                 case "datetime?":
                     return typeof(DateTime?);
