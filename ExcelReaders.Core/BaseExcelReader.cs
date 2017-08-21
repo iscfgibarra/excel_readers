@@ -205,9 +205,13 @@ namespace ExcelReaders.Core
                     propValue = string.Empty;
                     break;
             }
+            
+            if (double.TryParse(propValue, out doubleValue))
+            {
+                return doubleValue.ToString(format);
+            }
 
-            double.TryParse(propValue, out doubleValue);
-            return doubleValue.ToString(format);
+            return propValue;
         }
        
         /// <summary>
