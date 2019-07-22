@@ -30,6 +30,8 @@ namespace ExcelReaders.Core
 
         public static string ExcelSourceDirectory { get; set; }
 
+        private IFormulaEvaluator _formulaEvaluator;
+
         public string XlsFilename { get; set; }
 
 
@@ -97,7 +99,7 @@ namespace ExcelReaders.Core
         /// almacena en la variable estática _rowDataList.
         /// </summary>
         /// <returns>True si la lista tiene elementos.</returns>
-        public bool LoadData()
+        public bool LoadData(int stopRow = -1, int starRow = -1)
         {
             if (_rowDataList == null)
             {
@@ -106,6 +108,11 @@ namespace ExcelReaders.Core
                 using (var fs = File.OpenRead(XlsFullPath))
                 {
                     var workBook = new HSSFWorkbook(fs);
+
+
+                    //var workBook = new NPOI.XSSF.UserModel.XSSFWorkbook(fs);
+                    //_formulaEvaluator = workBook.GetCreationHelper().CreateFormulaEvaluator();
+
                     var mapperConfig = MappersConfig.FirstOrDefault();
                     bool hasMoreMappers = MappersConfig.Count > 1;
 
@@ -118,8 +125,11 @@ namespace ExcelReaders.Core
                             mapperConfig = MappersConfig.FirstOrDefault(m => m.Name == sheetConfig.Map);
                         }
 
-                        for (int rowIndex = sheetConfig.RowNumberStartData - 1;
-                                    rowIndex < sheetConfig.RowNumberStopData;
+                        int start = starRow == -1 ? sheetConfig.RowNumberStartData : starRow;
+                        int stop = stopRow == -1 ? sheetConfig.RowNumberStopData : stopRow;
+
+                        for (int rowIndex = start - 1;
+                                    rowIndex < stop;
                                             rowIndex++)
                         {
                             var row = sheet.GetRow(rowIndex);
@@ -165,7 +175,9 @@ namespace ExcelReaders.Core
                 {
                     if (GetAttributeType(map.AttributeType) == typeof(Guid))
                     {
-                        obj[map.Attribute] = Guid.NewGuid();
+                        //obj[map.Attribute] = Guid.NewGuid();
+                        //NEWID()
+                        obj[map.Attribute] = "NEWID()";
                     }
                     else
                     {

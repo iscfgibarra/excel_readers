@@ -201,6 +201,9 @@ Y otro ejemplo de un mapeo de multiples hojas hacia una misma colección con el 
 </ExcelMapping>
 ```
 
+Hay que destacar que el formato se usa para forzar la conversión desde un campo que podria ser un número almacenado como texto, cosa común cuando no
+se formatea correctamente la hoja de excel. Y necesitamos expresar numeros con ceros a la izquierda (ejem. **"0025"**).
+
 
 
 ## Ejemplos de Uso
@@ -264,6 +267,119 @@ Por lo que no es necesario llamar al meétodo cada vez que se necesitan los dato
 
 
 ## Calculate Fields
+
+Para los casos en los que hay campos que dependen del valor de otros, existe este método.
+**Se ejecuta siempre despues de se han llenado todos  los datos desde Excel en el objeto mapeado.**
+
+En casi todas las implementaciones para este proyecto en particular se esta usando este método para asignar el campo **Key** de la clase
+base, no todas las clases a mapear tienen el campo **Clave**, por lo que se decidio mapearlo para realizar las busquedas sobre el campo **Key** 
+o realizar una implementación de la busqueda de manera especifica.
+
+**Ejemplo:**
+En el MonedaExcelReader, se están calculando 2 campos, el campo **Key** y el **PorcentajeVariacion** que en la hoja de catálogos de excel esta expresado
+como un porcentaje (menor a 1), sin embargo en la implementación actual esta almacenado como un entero mayor que 100, por lo que estamos haciendo este ajuste
+en el método para evitar errores en las validaciones.
+
+```
+public class MonedaExcelReader : BaseExcelReader<MonedaResult>
+{
+	public MonedaExcelReader() : base(ConfigurationHelper.ExcelSourceDirectory
+		, ConfigurationHelper.ExcelSourceCatCfdiFileName
+		, ConfigurationHelper.MonedaExcelMappingName)
+	{
+	}
+
+	public override void CalculateFields(ref MonedaResult obj)
+	{
+		obj.Key = obj.Clave;
+		if (obj.PorcentajeVariacion < 1)
+		{
+			obj.PorcentajeVariacion = obj.PorcentajeVariacion * 100;
+		}
+	}
+}
+```
+
+## BaseRepository
+
+Fue necesario implementar un repositorio similar al existente y usar la interface ICatalogRepository < T >
+```
+public class BaseRepository<T> : ICatalogRepository<T>
+    where T : BaseResult, new()
+{       
+	public BaseRepository(string mainCacheKey = "", bool withCache = false)
+	{
+		MainCacheKey = mainCacheKey;
+		WithCache = withCache;
+	}
+
+	public string MainCacheKey { get; set; }
+        
+	public bool WithCache { get; set; }
+        
+	public virtual bool GetByKey(string key)
+	{
+		return GetByKey(key, DateTime.Now);
+	}
+
+	public virtual bool GetByKey(string key, DateTime date)
+	{ 
+		return GetDataByKey(key, date) != null;
+	}
+
+	public virtual T GetDataByKey(string key)
+	{
+		return GetDataByKey(key, DateTime.Now);
+	}
+
+	public virtual T GetDataByKey(string key, DateTime date)
+	{            
+		if(WithCache)
+			return SimpleCacheProvider<T>.Instance.GetCacheItem($"{MainCacheKey}:{key}", CachePopulate(key, date));
+
+		return GetItem(key, date);
+	}
+
+
+	protected virtual T GetItem(string key, DateTime date)
+	{
+		if (string.IsNullOrEmpty(key)) return null;
+
+		var list = ExcelReaderFactory.Create<T>().GetDataList.AsParallel().Where(t => t.Key == key);
+
+		return list?.AsParallel().Where(delegate (T item)
+			{
+				if (item.FechaInicioVigencia != null)
+				{
+					if (DateTime.Compare(date, item.FechaInicioVigencia.Value) < 0)
+					{
+					return false;
+					}
+				}
+
+				if (item.FechaFinVigencia != null)
+				{
+					return DateTime.Compare(date, item.FechaFinVigencia.Value) < 0;
+				}
+
+				return true;
+			})
+			.FirstOrDefault();
+            
+	}
+	
+	protected virtual Func<T> CachePopulate(string key, DateTime date)
+	{
+		return () => GetItem(key, date);
+	}
+}
+```
+
+El campo **WithCache** permite que la lista utilice **MemoryCache** para tener un acceso más rapido a los key-value mas usados.
+
+Si **WithCache es igual a true** se utiliza la clase **SimpleCacheProvider** y el metodo **CachePopulate** (funcion anónima) para regresar el valor que 
+necesita guardar la **MemoryCache**, es necesario tambíen establecer el campo **MainCacheKey** con la que se formará una llave de busqueda (**MainCacheKey:key**) en la **MemoryCache** y se pueda identificar adecuadamente este key-value adecuadamente.
+
 
 
 

@@ -37,6 +37,8 @@ namespace ExcelReaders.Core
 
         private IFormulaEvaluator _formulaEvaluator;
         
+        
+
         public string XlsFullPath
         {
             get
@@ -110,53 +112,42 @@ namespace ExcelReaders.Core
 
                 watch.Start();
                 _rowDataList = new ConcurrentBag<T>();
-                int index = -1;
-
-                try
+                
+                using (var fs = File.OpenRead(XlsFullPath))
                 {
-                    using (var fs = File.OpenRead(XlsFullPath))
-                    {
-                        var workBook = new NPOI.XSSF.UserModel.XSSFWorkbook(fs);
-                        _formulaEvaluator = workBook.GetCreationHelper().CreateFormulaEvaluator();
-                        var mapperConfig = MappersConfig.FirstOrDefault();
-                        bool hasMoreMappers = MappersConfig.Count > 1;
+                    var workBook = new HSSFWorkbook(fs);
+                    _formulaEvaluator = workBook.GetCreationHelper().CreateFormulaEvaluator();
+                    var mapperConfig = MappersConfig.FirstOrDefault();
+                    bool hasMoreMappers = MappersConfig.Count > 1;
 
-                        foreach (var sheetConfig in SheetsConfig)
+                    foreach (var sheetConfig in SheetsConfig)
+                    {                    
+                        var sheet = workBook.GetSheet(sheetConfig.SheetName);
+                        
+                        if (hasMoreMappers)
                         {
-                            var sheet = workBook.GetSheet(sheetConfig.SheetName);
+                            mapperConfig = MappersConfig.FirstOrDefault(m => m.Name == sheetConfig.Map);
+                        }
 
-                            if (hasMoreMappers)
-                            {
-                                mapperConfig = MappersConfig.FirstOrDefault(m => m.Name == sheetConfig.Map);
-                            }
+                        for (int rowIndex = sheetConfig.RowNumberStartData - 1; 
+                                    rowIndex < sheetConfig.RowNumberStopData; 
+                                            rowIndex++)
+                        {
+                            var row = sheet.GetRow(rowIndex);                            
+                            if(row == null) continue;
 
-                            for (int rowIndex = sheetConfig.RowNumberStartData - 1;
-                                rowIndex < sheetConfig.RowNumberStopData;
-                                rowIndex++)
-                            {
-                                index = rowIndex;
-                                var row = sheet.GetRow(rowIndex);
-                                if (row == null) continue;
+                            var obj = FillObject(mapperConfig, row);
 
-                                var obj = FillObject(mapperConfig, row);
-
-                                //Llenar propiedades derivadas de otras
-                                CalculateFields(ref obj);
-
-                                _rowDataList.Add(obj);
-                            }
+                            //Llenar propiedades derivadas de otras
+                            CalculateFields(ref obj);
+                            
+                            _rowDataList.Add(obj);
                         }
                     }
                 }
-                catch (Exception e)
-                {
-                    throw new Exception(e.Message, e.InnerException);
-                }
-                finally
-                {
-                    watch.Stop();
-                    _timeElapsed = watch.ElapsedMilliseconds;
-                }               
+
+                watch.Stop();
+                _timeElapsed = watch.ElapsedMilliseconds;
             }
 
             GC.Collect();
@@ -178,6 +169,7 @@ namespace ExcelReaders.Core
 
                 if (map.Ignore) continue;
 
+
                 var cell = row.GetCell(map.NoColumn);
                 if(cell == null) continue;
 
@@ -188,9 +180,6 @@ namespace ExcelReaders.Core
                 }
                 else
                 {                    
-                    //No, no esta duplicado el valor de cell, el primero se pasa como 
-                    //objeto para ganar velocidad en las conversiones y el segundo se 
-                    //pasa como celda para usarlo al evaluar las formulas cuando es necesario.
                     propInfo?.SetValue(obj, ConvertToAttributeType(propInfo, cell, cell));
                 }
             }
@@ -239,29 +228,28 @@ namespace ExcelReaders.Core
 
             return propValue;
         }
-
+       
         /// <summary>
         /// Permite convertir el valor de la celda en el valor apropiado de 
         /// acuerdo al tipo del atributo.
         /// <remarks>Hay que destacar que el value algunas veces se auto-asigna como String en lugar
-        /// de ICell. Eso le da velocidad de conversión, sin embargo en el caso de que la celda contenga una
-        /// formula es necesario el objeto ICell como tal.</remarks>
+        /// de ICell. </remarks>
         /// </summary>
         /// <param name="propertyInfo">Información de la propiedad</param>
-        /// <param name="value">Valor de la celda</param>        
-        /// <param name="cell">Este objeto </param>        
+        /// <param name="value">Valor de la celda</param>
         /// <returns></returns>
         private object  ConvertToAttributeType (PropertyInfo propertyInfo, object value, ICell cell)
         {
            
             if (value == null) return null;
 
-            //La conversión directa desde object es mucho más eficiente.
-            //Si falla entonces forza la conversión en las lineas siguientes.
             try
             {
+                //Se pregunta si es un string, algunas veces esta conversion falla
+                //sobre todo cuando el campo es de tipo Date, sin embargo no afecta el resultado 
+                //de las conversiones.
                 if (IsString(propertyInfo))
-                {
+                {                   
                     if (cell?.CellType == CellType.Formula)
                     {
                         _formulaEvaluator.EvaluateFormulaCell(cell);
@@ -286,18 +274,16 @@ namespace ExcelReaders.Core
 
         private object ConvertFromNumericTypes(PropertyInfo propertyInfo, object value)
         {
-            var celda = (ICell) value;
+            var valor = (ICell) value;
             var converter = TypeDescriptor.GetConverter(propertyInfo.PropertyType);
 
-            switch (celda.CellType)
+            switch (valor.CellType)
             {
                 case CellType.String:
-                    var stringToConverter = celda.StringCellValue.Trim();
-                    if (string.IsNullOrEmpty(stringToConverter))
-                       stringToConverter = "0";
+                    var stringToConverter = valor.StringCellValue.Trim() ?? "0";
                     return converter.ConvertFrom(stringToConverter.Replace(",", ""));
                 case CellType.Numeric:
-                    return converter.ConvertFrom(celda.NumericCellValue.ToString());
+                    return converter.ConvertFrom(valor.NumericCellValue.ToString());
                 case CellType.Blank:
                 case CellType.Unknown:
                 case CellType.Formula:
