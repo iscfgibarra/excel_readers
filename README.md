@@ -27,7 +27,7 @@ a objetos de una clase en particular.
 Para evitar la reflexión directa y darle velocidad al mapeo utilice una libreria de configuración, basta con agregar una sección
 de configuración en el app.config o web.config para que los datos se importen en una ConcurrentBag<T> de acuerdo al los mappings configurados.
 
-```
+```csharp
 ProyectoWeb-Ejecutable/
 	web.config ó app.config
 	ExcelMappingSection.config
@@ -36,7 +36,7 @@ ProyectoWeb-Ejecutable/
 
 La sección puede configurarse de la siguiente manera:
 
-```
+```xml
 <?xml version="1.0" encoding="utf-8" ?>
 <configuration>
   <configSections>
@@ -85,7 +85,7 @@ Un mapper contiene MapElements que son asociaciones de los campos de la clase co
 En el código de la clase a mapear es el siguiente:
 
 **BaseResult.cs**
-```
+```csharp
 public class BaseResult
 {
 	//Este campo se llena por medio de CalculateFields del ExcelReader
@@ -103,7 +103,7 @@ public class BaseResult
 
 **AduanaResult.cs**
 
-```
+```csharp
 public class AduanaResult : BaseResult
 	{
         public string Clave { get; set; }
@@ -119,7 +119,7 @@ public class AduanaResult : BaseResult
 
 La configuración para mapear de la hoja de Excel a la clases es como sigue:
 
-```
+```xml
 <ExcelMappingSection>
   <ExcelMappings>
     <ExcelMapping Name="Aduana">
@@ -144,7 +144,7 @@ La configuración para mapear de la hoja de Excel a la clases es como sigue:
 
 Aquí hay un ejemplo del uso de multiples mappers para una hoja de Excel con distintos formatos:
 
-```
+```xml
 <ExcelMapping Name="TipoComprobante">
       <Mappers>
         <Mapper Name="MapTipoComprobante">
@@ -179,7 +179,7 @@ Aquí hay un ejemplo del uso de multiples mappers para una hoja de Excel con dis
 
 Y otro ejemplo de un mapeo de multiples hojas hacia una misma colección con el mismo mapping y diferentes rangos de filas:
 
-```
+```xml
  <ExcelMapping Name="CodigoPostal">
       <Mappers>
         <Mapper Name="MapCP">
@@ -220,7 +220,7 @@ ProyectoWeb/Aplicacion
 En el código de ejemplo se construye la clase como un repositorio que hereda de la clase  **BaseExcelReader< >** que es la que se encargará del 
 trabajo de procesar los datos.
 
-```
+```csharp
 public class AduanaExcelReader : BaseExcelReader<AduanaResult>
 {        
 	public AduanaExcelReader() : base(
@@ -241,7 +241,7 @@ public class AduanaExcelReader : BaseExcelReader<AduanaResult>
 Para usarlo basta con invocar el método **LoadData** y utilizar la propiedad **GetDataList** del ExcelReader.
 
 
-```
+```csharp
  static void Main(string[] args)
 {
 	var reader = new AduanaExcelReader();
@@ -280,7 +280,7 @@ En el MonedaExcelReader, se están calculando 2 campos, el campo **Key** y el **
 como un porcentaje (menor a 1), sin embargo en la implementación actual esta almacenado como un entero mayor que 100, por lo que estamos haciendo este ajuste
 en el método para evitar errores en las validaciones.
 
-```
+```csharp
 public class MonedaExcelReader : BaseExcelReader<MonedaResult>
 {
 	public MonedaExcelReader() : base(ConfigurationHelper.ExcelSourceDirectory
@@ -303,7 +303,7 @@ public class MonedaExcelReader : BaseExcelReader<MonedaResult>
 ## BaseRepository
 
 Fue necesario implementar un repositorio similar al existente y usar la interface ICatalogRepository < T >
-```
+```csharp
 public class BaseRepository<T> : ICatalogRepository<T>
     where T : BaseResult, new()
 {       
